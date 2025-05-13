@@ -6,15 +6,9 @@ $.verbose = true;
 const ROOT_DIR = process.cwd();
 const MONOREPO_URL = 'https://github.com/formio/formio-monorepo';
 const TEMP_DIR = path.resolve(ROOT_DIR, '..', 'tmp/formio-monorepo');
-const GH_TOKEN = process.env.GH_TOKEN;
 const MONOREPO_PACKAGE_LOCATION = process.env.MONOREPO_PACKAGE_LOCATION || 'apps/formio-server';
 const SOURCE_REPO_OWNER = process.env.SOURCE_REPO_OWNER || 'formio';
-const SOURCE_REPO_NAME = process.env.SOURCE_REPO_NAME || 'formio-server';
 
-if(!GH_TOKEN) {
-  console.error('Please set the GH_TOKEN environment variable with a valid GitHub token.');
-  process.exit(1);
-}
 
 async function cloneMonoRepo() {
   // check delete temp directory if exists
@@ -60,12 +54,12 @@ async function getMergedPullRequests(since) {
     query = `?base=master&state=closed&sort=updated&direction=desc&since=${sinceDate.toISOString()}`;
   }
   
-  const url = `https://api.github.com/repos/${SOURCE_REPO_OWNER}/${SOURCE_REPO_NAME}/pulls${query}`;
+  const url = `https://api.github.com/repos/${SOURCE_REPO_OWNER}/${process.env.SOURCE_REPO_NAME}/pulls${query}`;
   console.log(`Fetching PRs from: ${url}`);
   
   const response = await fetch(url, {
     headers: {
-      'Authorization': `token ${GH_TOKEN}`,
+      'Authorization': `token ${process.env.GH_TOKEN}`,
       'Accept': 'application/vnd.github.v3+json'
     }
   });
@@ -95,10 +89,10 @@ async function getMergedPullRequests(since) {
 async function getPRDetails(prNumber) {
   console.log(`Getting details for PR #${prNumber}...`);
   
-  const url = `https://api.github.com/repos/${SOURCE_REPO_OWNER}/${SOURCE_REPO_NAME}/pulls/${prNumber}`;
+  const url = `https://api.github.com/repos/${SOURCE_REPO_OWNER}/${process.env.SOURCE_REPO_NAME}/pulls/${prNumber}`;
   const response = await fetch(url, {
     headers: {
-      'Authorization': `token ${GH_TOKEN}`,
+      'Authorization': `token ${process.env.GH_TOKEN}`,
       'Accept': 'application/vnd.github.v3+json'
     }
   });
@@ -114,10 +108,11 @@ async function getPRDetails(prNumber) {
 async function getPRChanges(prNumber) {
   console.log(`Getting changes for PR #${prNumber}...`);
   
-  const url = `https://api.github.com/repos/${SOURCE_REPO_OWNER}/${SOURCE_REPO_NAME}/pulls/${prNumber}/files`;
+  const url = `https://api.github.com/repos/${SOURCE_REPO_OWNER}/${process.env.SOURCE_REPO_NAME}/pulls/${prNumber}/files`;
+  console.log(`Fetching changes from: ${url}`);
   const response = await fetch(url, {
     headers: {
-      'Authorization': `token ${GH_TOKEN}`,
+      'Authorization': `token ${process.env.GH_TOKEN}`,
       'Accept': 'application/vnd.github.v3+json'
     }
   });
@@ -131,6 +126,7 @@ async function getPRChanges(prNumber) {
   
   // Convert GitHub's file change format to our format
   return files.map(file => {
+    console.log('gh file:', file);
     // GitHub API uses 'status' values: added, modified, removed, renamed, etc.
     let status = file.status;
     
@@ -153,7 +149,7 @@ async function syncChange(change) {
   console.log('Syncing change:', change);
   const { path: changedFilePath, status, previous_path } = change;
   const sourcePath = path.resolve(ROOT_DIR, changedFilePath);
-  const targetPath = path.join(TEMP_DIR, MONOREPO_PACKAGE_LOCATION, changedFilePath);
+  const targetPath = path.join(TEMP_DIR, process.env.MONOREPO_PACKAGE_LOCATION, changedFilePath);
   
   switch (status) {
     case 'added':
@@ -179,7 +175,7 @@ async function syncChange(change) {
       
     case 'renamed':
       // Handle renaming
-      const previousTargetPath = path.join(TEMP_DIR, MONOREPO_PACKAGE_LOCATION, previous_path);
+      const previousTargetPath = path.join(TEMP_DIR, process.env.MONOREPO_PACKAGE_LOCATION, previous_path);
       console.log(`Renaming ${previousTargetPath} to ${targetPath}`);
       
       // Remove old file if it exists
@@ -248,7 +244,7 @@ async function syncPR(pr) {
   
   // Create a PR in the monorepo
   // Prepare PR body with attribution and original description
-  let prBody = `This PR syncs changes from [${SOURCE_REPO_NAME} PR #${prNumber}](${pr.html_url}) by @${prUser}.\n\n`;
+  let prBody = `This PR syncs changes from [${process.env.SOURCE_REPO_NAME} PR #${prNumber}](${pr.html_url}) by @${prUser}.\n\n`;
   
   // Add original PR description
   if (pr.body) {
@@ -261,7 +257,7 @@ async function syncPR(pr) {
   const response = await fetch(`https://api.github.com/repos/formio/formio-monorepo/pulls`, {
     method: 'POST',
     headers: {
-      'Authorization': `token ${GH_TOKEN}`,
+      'Authorization': `token ${process.env.GH_TOKEN}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
@@ -287,14 +283,30 @@ async function syncPR(pr) {
 
 export async function sync() {
   // repo name from command line or environment variable
-  const repoName = process.argv[2] || process.env.REPO_NAME || SOURCE_REPO_NAME;
+  
   // last synced PR number or date from command line or environment variable
-  const prNumber = process.argv[3] || process.env.PR_NUMBER;
+  const prNumber = process.argv[2] || process.env.PR_NUMBER;
+
+  
   
   if(!prNumber) {
     console.error('Please provide a PR number or date to sync from.');
     process.exit(1);
   }
+  if(!process.env.GH_TOKEN) {
+    console.error('Please set the GH_TOKEN environment variable with a valid GitHub token.');
+    process.exit(1);
+  }
+  if(!process.env.MONOREPO_PACKAGE_LOCATION) {
+    console.error('Please set the MONOREPO_PACKAGE_LOCATION environment variable with the relative monorepo path to package.');
+    process.exit(1);
+  }
+
+  if(!process.env.SOURCE_REPO_NAME) {
+    console.error('Please set the SOURCE_REPO_NAME environment variable with the name of the source repo.');
+    process.exit(1);
+  }
+
   
   // Clone monorepo
   await cloneMonoRepo();
@@ -310,4 +322,3 @@ export async function sync() {
   
   console.log('Sync completed successfully!');
 }
-
