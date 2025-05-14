@@ -8,7 +8,7 @@ const MONOREPO_URL = 'https://github.com/formio/formio-monorepo';
 const TEMP_DIR = path.resolve(ROOT_DIR, '..', 'tmp/formio-monorepo');
 const MONOREPO_PACKAGE_LOCATION = process.env.MONOREPO_PACKAGE_LOCATION || 'apps/formio-server';
 const SOURCE_REPO_OWNER = process.env.SOURCE_REPO_OWNER || 'formio';
-const SOURCE_REPO_TEMP_DIR = path.resolve(ROOT_DIR, '..', 'tmp/source-repo');
+
 
 async function cloneMonoRepo() {
   // check delete temp directory if exists
@@ -23,25 +23,6 @@ async function cloneMonoRepo() {
     console.log('Monorepo cloned successfully.');
   } catch (error) {
     console.error('Error cloning monorepo:', error);
-    process.exit(1);
-  }
-}
-
-async function cloneSourceRepo() {
-  // Clear existing source repo directory if it exists
-  try {
-    await $`rm -rf ${SOURCE_REPO_TEMP_DIR}`;
-  } catch (error) {
-    console.error('Error deleting source repo directory:', error);
-  }
-  
-  // Clone the source repository
-  try {
-    const sourceRepoUrl = `https://github.com/${SOURCE_REPO_OWNER}/${process.env.SOURCE_REPO_NAME}.git`;
-    await $`git clone ${sourceRepoUrl} ${SOURCE_REPO_TEMP_DIR}`;
-    console.log('Source repository cloned successfully.');
-  } catch (error) {
-    console.error('Error cloning source repository:', error);
     process.exit(1);
   }
 }
@@ -167,7 +148,7 @@ async function getPRChanges(prNumber) {
 async function syncChange(change) {
   console.log('Syncing change:', change);
   const { path: changedFilePath, status, previous_path } = change;
-  const sourcePath = path.resolve(SOURCE_REPO_TEMP_DIR, changedFilePath);
+  const sourcePath = path.resolve(ROOT_DIR, changedFilePath);
   const targetPath = path.join(TEMP_DIR, process.env.MONOREPO_PACKAGE_LOCATION, changedFilePath);
   
   switch (status) {
@@ -220,38 +201,7 @@ async function syncPR(pr) {
   
   console.log(`Syncing PR #${prNumber}: "${prTitle}" by ${prUser}`);
   
-  // Clone the source repository
-  await cloneSourceRepo();
-  
-  // Checkout the base commit of the PR
-  await cd(SOURCE_REPO_TEMP_DIR);
-  
-  // Get the merge base commit (the point where the PR branch was created)
-  const baseCommit = pr.base.sha;
-  console.log(`Checking out base commit: ${baseCommit}`);
-  
-  try {
-    await $`git checkout ${baseCommit}`;
-  } catch (error) {
-    console.error('Error checking out base commit:', error);
-    process.exit(1);
-  }
-  
-  // Apply PR changes on top of this base
-  await $`git fetch origin pull/${prNumber}/head:pr-${prNumber}`;
-  
-  try {
-    await $`git checkout pr-${prNumber}`;
-    console.log(`Checked out PR branch successfully`);
-  } catch (error) {
-    console.error('Error checking out PR branch:', error);
-    process.exit(1);
-  }
-  
-  // Return to the root directory
-  await cd(ROOT_DIR);
-  
-  // Generate a branch name for this PR in the monorepo
+  // Generate a branch name for this PR
   const branchName = `sync-pr-${prNumber}-${Date.now().toString().slice(-6)}`;
   
   // Create a new branch in the monorepo
@@ -361,10 +311,12 @@ export async function sync() {
   // Clone monorepo
   await cloneMonoRepo();
   
+  // Get all merged PRs since the specified reference point
+  
   // Get detailed PR information including body
   const prDetails = await getPRDetails(prNumber);
     
-  // Sync this PR to the monorepo
+    // Sync this PR to the monorepo
   await syncPR(prDetails);
     
   
