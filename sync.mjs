@@ -5,7 +5,7 @@ $.verbose = true;
 
 const ROOT_DIR = process.cwd();
 const MONOREPO_URL = 'https://github.com/formio/formio-monorepo';
-const TEMP_DIR = path.resolve(ROOT_DIR, '..', 'tmp/formio-monorepo');
+let TEMP_DIR = path.resolve(ROOT_DIR, '..', 'tmp/formio-monorepo');
 const MONOREPO_PACKAGE_LOCATION = process.env.MONOREPO_PACKAGE_LOCATION || 'apps/formio-server';
 const SOURCE_REPO_OWNER = process.env.SOURCE_REPO_OWNER || 'formio';
 
@@ -86,7 +86,7 @@ async function getMergedPullRequests(since) {
   return mergedPRs;
 }
 
-async function getPRDetails(prNumber) {
+export async function getPRDetails(prNumber) {
   console.log(`Getting details for PR #${prNumber}...`);
   
   const url = `https://api.github.com/repos/${SOURCE_REPO_OWNER}/${process.env.SOURCE_REPO_NAME}/pulls/${prNumber}`;
@@ -105,7 +105,7 @@ async function getPRDetails(prNumber) {
   return await response.json();
 }
 
-async function getPRChanges(prNumber) {
+export async function getPRChanges(prNumber) {
   console.log(`Getting changes for PR #${prNumber}...`);
   
   const url = `https://api.github.com/repos/${SOURCE_REPO_OWNER}/${process.env.SOURCE_REPO_NAME}/pulls/${prNumber}/files`;
@@ -145,7 +145,7 @@ async function getPRChanges(prNumber) {
   });
 }
 
-async function syncChange(change) {
+export async function syncChange(change) {
   console.log('Syncing change:', change);
   const { path: changedFilePath, status, previous_path } = change;
   const sourcePath = path.resolve(ROOT_DIR, changedFilePath);
@@ -194,7 +194,7 @@ async function syncChange(change) {
   }
 }
 
-async function syncPR(pr) {
+export async function syncPR(pr) {
   const prNumber = pr.number;
   const prTitle = pr.title;
   const prUser = pr.user.login;
@@ -321,4 +321,50 @@ export async function sync() {
     
   
   console.log('Sync completed successfully!');
+}
+
+export function syncFromGithubAction(){
+  const prNumber = process.env.PR_NUMBER;
+  
+  
+  
+  if(!prNumber) {
+    console.error('Please provide a PR number or date to sync from.');
+    process.exit(1);
+  }
+  if(!process.env.GH_TOKEN) {
+    console.error('Please set the GH_TOKEN environment variable with a valid GitHub token.');
+    process.exit(1);
+  }
+  if(!process.env.MONOREPO_PACKAGE_LOCATION) {
+    console.error('Please set the MONOREPO_PACKAGE_LOCATION environment variable with the relative monorepo path to package.');
+    process.exit(1);
+  }
+
+  if(!process.env.SOURCE_REPO_NAME) {
+    console.error('Please set the SOURCE_REPO_NAME environment variable with the name of the source repo.');
+    process.exit(1);
+  }
+  if(!process.env.MONOREPO_LOCATION) {
+    console.error('Please set the MONOREPO_LOCATION environment variable with the location of the monorepo.');
+    process.exit(1);
+  }
+
+  TEMP_DIR = process.env.MONOREPO_LOCATION
+
+  
+  // Clone monorepo
+
+  
+  // Get all merged PRs since the specified reference point
+  
+  // Get detailed PR information including body
+  const prDetails = await getPRDetails(prNumber);
+    
+    // Sync this PR to the monorepo
+  await syncPR(prDetails);
+    
+  
+  console.log('Sync completed successfully!');
+
 }
