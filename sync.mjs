@@ -345,12 +345,12 @@ export async function syncFromGithubAction(){
     console.error('Please set the SOURCE_REPO_NAME environment variable with the name of the source repo.');
     process.exit(1);
   }
-  if(!process.env.MONOREPO_LOCATION) {
+  if(!process.env.MONOREPO_PATH) {
     console.error('Please set the MONOREPO_LOCATION environment variable with the location of the monorepo.');
     process.exit(1);
   }
 
-  TEMP_DIR = process.env.MONOREPO_LOCATION
+  TEMP_DIR = process.env.MONOREPO_PATH
 
   
   // Clone monorepo
