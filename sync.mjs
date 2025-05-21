@@ -323,7 +323,7 @@ export async function sync() {
   console.log('Sync completed successfully!');
 }
 
-export function syncFromGithubAction(){
+export async function syncFromGithubAction(){
   const prNumber = process.env.PR_NUMBER;
   
   
