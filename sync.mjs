@@ -228,6 +228,9 @@ export async function syncPR(pr) {
   const authorName = pr.user.name || pr.user.login;
   const authorEmail = pr.user.email || `${pr.user.login}@users.noreply.github.com`;
   
+  // Set up Git authentication with token
+  await $`git remote set-url origin https://${process.env.GH_TOKEN}@github.com/formio/formio-monorepo.git`;
+
   await $`git config user.name "${authorName}"`;
   await $`git config user.email "${authorEmail}"`;
   
